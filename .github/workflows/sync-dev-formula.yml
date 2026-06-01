@@ -2,6 +2,9 @@ name: sync-dev-formula
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types:
+      - sync-dev-formula
   schedule:
     - cron: "*/15 * * * *"
 
