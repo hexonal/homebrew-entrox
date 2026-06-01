@@ -1,0 +1,96 @@
+name: sync-dev-formula
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-dev-formula
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Sync Entrox dev formula
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import re
+          import textwrap
+          import urllib.request
+
+          release_url = "https://api.github.com/repos/hexonal/entrox/releases/tags/entrox-dev"
+          with urllib.request.urlopen(release_url) as response:
+              release = json.load(response)
+
+          body = release.get("body") or ""
+          version_match = re.search(r"Version:\s*`?([^`\s]+)`?", body)
+          current_formula = pathlib.Path("Formula/entrox.rb").read_text() if pathlib.Path("Formula/entrox.rb").exists() else ""
+          current_version_match = re.search(r'version "([^"]+)"', current_formula)
+          version = version_match.group(1) if version_match else (current_version_match.group(1) if current_version_match else "0.0.0-ci")
+
+          assets = {asset["name"]: asset["browser_download_url"] for asset in release.get("assets", [])}
+
+          def sha256_for(asset_name: str) -> str:
+              with urllib.request.urlopen(assets[asset_name]) as response:
+                  return hashlib.sha256(response.read()).hexdigest()
+
+          macos_arm64_hash = sha256_for("entrox-cli-macos-arm64.zip")
+          linux_x64_hash = sha256_for("entrox-cli-linux-x64.zip")
+
+          formula = f"""\
+          # typed: false
+          # frozen_string_literal: true
+
+          class Entrox < Formula
+            desc "Entrox CLI"
+            homepage "https://entrox.996icu.wiki"
+            version "{version}"
+            license "MIT"
+
+            on_macos do
+              depends_on arch: :arm64
+
+              url "https://github.com/hexonal/entrox/releases/download/entrox-dev/entrox-cli-macos-arm64.zip"
+              sha256 "{macos_arm64_hash}"
+            end
+
+            on_linux do
+              depends_on arch: :x86_64
+
+              url "https://github.com/hexonal/entrox/releases/download/entrox-dev/entrox-cli-linux-x64.zip"
+              sha256 "{linux_x64_hash}"
+            end
+
+            depends_on "ripgrep"
+
+            def install
+              bin.install "bin/entrox"
+            end
+
+            test do
+              system "#{{bin}}/entrox", "--version"
+            end
+          end
+          """
+          pathlib.Path("Formula").mkdir(exist_ok=True)
+          pathlib.Path("Formula/entrox.rb").write_text(textwrap.dedent(formula))
+          PY
+          ruby -c Formula/entrox.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/entrox.rb
+          if ! git diff --cached --quiet; then
+            git commit -m "Update Entrox dev Homebrew formula"
+            git push
+          fi
