@@ -11,14 +11,14 @@ class Entrox < Formula
     depends_on arch: :arm64
 
     url "https://github.com/hexonal/entrox/releases/download/entrox-dev/entrox-cli-macos-arm64.zip"
-    sha256 "55a63300eef99f0fa7ce04808df3be08c8c7cd86ef164ac227297e44b6c3c33e"
+    sha256 "b1ab93414a21f1f9345fb420f3f9f16e3925377762aeb9a50fd89c0496a49972"
   end
 
   on_linux do
     depends_on arch: :x86_64
 
     url "https://github.com/hexonal/entrox/releases/download/entrox-dev/entrox-cli-linux-x64.zip"
-    sha256 "8ee1884efb46cc3de0dddd150faf389f5ab36d0c36f04d363115ce98e58b56be"
+    sha256 "540c14d0258a0aaa48ca9a2d69b039a95f31ffd3fdd138573ff2c2060776cc55"
   end
 
   depends_on "ripgrep"
