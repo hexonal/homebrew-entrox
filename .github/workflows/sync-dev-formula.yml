@@ -25,31 +25,28 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import hashlib
           import json
           import pathlib
-          import re
           import textwrap
           import urllib.request
 
-          release_url = "https://api.github.com/repos/hexonal/entrox/releases/tags/entrox-dev"
-          with urllib.request.urlopen(release_url) as response:
-              release = json.load(response)
+          manifest_url = "https://entrox.996icu.wiki/downloads/entrox-dev/latest.json"
+          with urllib.request.urlopen(manifest_url) as response:
+              manifest = json.load(response)
 
-          body = release.get("body") or ""
-          version_match = re.search(r"Version:\s*`?([^`\s]+)`?", body)
-          current_formula = pathlib.Path("Formula/entrox.rb").read_text() if pathlib.Path("Formula/entrox.rb").exists() else ""
-          current_version_match = re.search(r'version "([^"]+)"', current_formula)
-          version = version_match.group(1) if version_match else (current_version_match.group(1) if current_version_match else "0.0.0-ci")
+          version = manifest.get("version") or "0.0.0-ci"
+          assets = {asset["name"]: asset for asset in manifest.get("assets", [])}
 
-          assets = {asset["name"]: asset["browser_download_url"] for asset in release.get("assets", [])}
+          def asset(name: str) -> dict:
+              value = assets.get(name)
+              if not value:
+                  raise RuntimeError(f"missing {name} in {manifest_url}")
+              if not value.get("url") or not value.get("sha256"):
+                  raise RuntimeError(f"missing url or sha256 for {name} in {manifest_url}")
+              return value
 
-          def sha256_for(asset_name: str) -> str:
-              with urllib.request.urlopen(assets[asset_name]) as response:
-                  return hashlib.sha256(response.read()).hexdigest()
-
-          macos_arm64_hash = sha256_for("entrox-cli-macos-arm64.zip")
-          linux_x64_hash = sha256_for("entrox-cli-linux-x64.zip")
+          macos_arm64 = asset("entrox-cli-macos-arm64.zip")
+          linux_x64 = asset("entrox-cli-linux-x64.zip")
 
           formula = f"""\
           # typed: false
@@ -64,15 +61,15 @@ jobs:
             on_macos do
               depends_on arch: :arm64
 
-              url "https://github.com/hexonal/entrox/releases/download/entrox-dev/entrox-cli-macos-arm64.zip"
-              sha256 "{macos_arm64_hash}"
+              url "{macos_arm64["url"]}"
+              sha256 "{macos_arm64["sha256"]}"
             end
 
             on_linux do
               depends_on arch: :x86_64
 
-              url "https://github.com/hexonal/entrox/releases/download/entrox-dev/entrox-cli-linux-x64.zip"
-              sha256 "{linux_x64_hash}"
+              url "{linux_x64["url"]}"
+              sha256 "{linux_x64["sha256"]}"
             end
 
             depends_on "ripgrep"
