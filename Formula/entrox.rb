@@ -4,21 +4,21 @@
 class Entrox < Formula
   desc "Entrox CLI"
   homepage "https://entrox.996icu.wiki"
-  version "0.0.0-ci.39.1"
+  version "0.0.0-ci.40.1"
   license "MIT"
 
   on_macos do
     depends_on arch: :arm64
 
-    url "https://entrox-download.996icu.wiki/entrox-dev/0.0.0-ci.39.1/entrox-cli-macos-arm64.zip"
-    sha256 "28ac3ca4f1b0f9781f841fcb9354f1fd9b18665d0fabad7676c0e035d454a3ca"
+    url "https://entrox-download.996icu.wiki/entrox-dev/0.0.0-ci.40.1/entrox-cli-macos-arm64.zip"
+    sha256 "886ec58411a8b745afa9a801835ed189d9fad6b9f76f5684598786d797883e01"
   end
 
   on_linux do
     depends_on arch: :x86_64
 
-    url "https://entrox-download.996icu.wiki/entrox-dev/0.0.0-ci.39.1/entrox-cli-linux-x64.zip"
-    sha256 "a6002c362f121d30e0b6b6915ec1c86f9fa36ea1e38e8cb3730521a8c7d4efba"
+    url "https://entrox-download.996icu.wiki/entrox-dev/0.0.0-ci.40.1/entrox-cli-linux-x64.zip"
+    sha256 "3c89e32716d8a4aa1319c89befa8163c46d9323ebe9708e855fb47e4d29089ee"
   end
 
   depends_on "ripgrep"
