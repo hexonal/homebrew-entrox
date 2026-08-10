@@ -6,7 +6,7 @@ on:
     types:
       - sync-dev-formula
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "0 * * * *"
 
 permissions:
   contents: write
@@ -24,15 +24,42 @@ jobs:
       - name: Sync Entrox dev formula
         run: |
           set -euo pipefail
-          python3 - <<'PY'
+          status=0
+          python3 - <<'PY' || status=$?
           import json
           import pathlib
+          import sys
           import textwrap
+          import time
+          import urllib.error
           import urllib.request
 
           manifest_url = "https://entrox.996icu.wiki/downloads/entrox-dev/latest.json"
-          with urllib.request.urlopen(manifest_url) as response:
-              manifest = json.load(response)
+          attempts = 3
+          timeout = 20
+          unavailable_exit = 75
+
+          def fetch(url: str) -> dict:
+              for attempt in range(1, attempts + 1):
+                  try:
+                      request = urllib.request.Request(url, headers={"User-Agent": "entrox-tap-sync"})
+                      with urllib.request.urlopen(request, timeout=timeout) as response:
+                          return json.load(response)
+                  except urllib.error.HTTPError as error:
+                      if error.code != 429 and error.code < 500:
+                          raise
+                      reason = f"HTTP {error.code}"
+                  except (urllib.error.URLError, TimeoutError) as error:
+                      reason = f"{type(error).__name__}: {error}"
+                  except json.JSONDecodeError as error:
+                      reason = f"response was not JSON: {error}"
+                  print(f"attempt {attempt}/{attempts} failed ({reason})", file=sys.stderr)
+                  if attempt < attempts:
+                      time.sleep(3 * 2 ** (attempt - 1))
+              print(f"{url} is unavailable after {attempts} attempts", file=sys.stderr)
+              sys.exit(unavailable_exit)
+
+          manifest = fetch(manifest_url)
 
           version = manifest.get("version") or "0.0.0-ci"
           assets = {asset["name"]: asset for asset in manifest.get("assets", [])}
@@ -86,6 +113,13 @@ jobs:
           pathlib.Path("Formula").mkdir(exist_ok=True)
           pathlib.Path("Formula/entrox.rb").write_text(textwrap.dedent(formula))
           PY
+          if [ "$status" -eq 75 ]; then
+            echo "::notice title=Upstream unavailable::Dev manifest service is unreachable; leaving the formula untouched."
+            exit 0
+          fi
+          if [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
           ruby -c Formula/entrox.rb
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
